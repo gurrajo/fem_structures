@@ -9,7 +9,7 @@ H3 = 8*10^-3;
 R = 1*10^-3;
 h = 100*10^-3;
 
-rho = 0; % kg/m^3
+rho = 0; % kg/m^3 set to zero to remove body forces
 g = 9.82; % m/s^2
 
 
@@ -29,7 +29,12 @@ f = zeros(ndofs,1);
 a = zeros(ndofs,1);
 %% Material data
 mpar.Emod = 20.e6; % Youngs modulus [Pa]
-mpar.v = 0.45; % Poisson's ratio [-]
+mpar.v = 0.45; % Poisson's ratio [-2
+mpar.lambda = mpar.v*mpar.Emod/((1+mpar.v)*(1-2*mpar.v));
+mpar.Gmod= mpar.Emod/(2*(1+mpar.v));
+mpar.c2 = -mpar.Gmod/10;
+mpar.c3 = mpar.Gmod/30;
+
 
 ptype = 2; %ptype=1: plane stress
 % 2: plane strain, 3:axisym, 4: 3d
@@ -50,9 +55,9 @@ body = [zeros(1,nel)' , grav_force'];
 % initialize stuff for newton prococedure
 aold = a;
 da = a;
-ntime = 10;
+ntime = 100; % need more times steps for finer mesh 30 ok for coarse, 100 ok for very fine
 tend = 10;
-t = linspace(0,tend,ntime);
+t = linspace(0,tend,ntime+1);
 uu = linspace(0,u_tau,ntime);
 
 %% Setup and solve FE equations
@@ -70,19 +75,25 @@ for i=1:ntime
         %loop over elements
          for el = 1:nel
             Ae=Ae_cst_func( [ Ex(el,1) Ey(el,1) ]',[ Ex(el,2) Ey(el,2) ]',[ Ex(el,3) Ey(el,3) ]');
-            Be=Be_cst_func( [ Ex(el,1) Ey(el,1) ]',[ Ex(el,2) Ey(el,2) ]',[ Ex(el,3) Ey(el,3) ]');
-            Ke=Be'*D*Be*Ae*h;
-            fe=[body(el,:) body(el,:) body(el,:)]'*Ae*h;
+            Be0=Be0_cst_largedef_func( [ Ex(el,1) Ey(el,1) ]',[ Ex(el,2) Ey(el,2) ]',[ Ex(el,3) Ey(el,3) ]');
+            Fv = [1 1 0 0]' + Be0*a(Edof(el,2:end));
+            
+            [S,Pv,dPvdFv] = yeoh_cst_func(mpar.Gmod,mpar.lambda,mpar.c2,mpar.c3,Fv);
+            
+            Ke_int=Be0'*dPvdFv*Be0*Ae*h;
+            fe_int=Be0'*Pv*Ae*h;
             % assembling
-            K(Edof(el,2:end),Edof(el,2:end)) = K(Edof(el,2:end),Edof(el,2:end)) + Ke;
-            f(Edof(el,2:end))= f(Edof(el,2:end)) + fe;
-        end
+            K(Edof(el,2:end),Edof(el,2:end)) = K(Edof(el,2:end),Edof(el,2:end)) + Ke_int;
+            f(Edof(el,2:end))= f(Edof(el,2:end)) + fe_int;
+         end
+        %K = real(K); % not needed when ntime is large enough
+        %f = real(f); 
         %unbalance equation
-        g_F=K(dof_F, dof_F)*a(dof_F) + K(dof_F, dof_C)*a(dof_C) - f(dof_F);
+        g_F = f(dof_F); %f_ext = 0
         unbal=norm(g_F);
         if unbal > tol
             %Newton update
-            a(dof_F,1)=a(dof_F) - K(dof_F,dof_F)\g_F;
+            a(dof_F)=a(dof_F) - K(dof_F,dof_F)\g_F;
         end
         
         niter=niter+1; %update iter counter
@@ -104,11 +115,14 @@ for i=1:ntime
     
     da=a-aold;
     aold = a;
-    figure
-    Ed = extract(Edof,a); % extract element displacements for plotting
-    plotpar=[1 1 0];
-    sfac = 1; % magnification factor
-    eldisp2(Ex,Ey,Ed,plotpar,sfac);
+    if mod(i,10) == 0
+        % plot every 10th timestep
+        figure
+        Ed = extract(Edof,a); % extract element displacements for plotting
+        plotpar=[1 1 0];
+        sfac = 1; % magnification factor
+        eldisp2(Ex,Ey,Ed,plotpar,sfac);
+    end
 end
 figure
 plot(uu,top_force_hori)
@@ -118,47 +132,21 @@ legend("horizontal force","vertical force")
 xlabel("u_\tau [m]")
 ylabel("force [N]")
 %find the stresses in the elements sigx, sigy, tauxy
-Es = zeros(nel,3);Et = zeros(nel,3);
+
 for el = 1:nel
-    Be=Be_cst_func( [ Ex(el,1) Ey(el,1) ]',[ Ex(el,2) Ey(el,2) ]',[ Ex(el,3) Ey(el,3) ]');
-
-    Et(el,:)=Be*a(Edof(el,2:end));
-    Es(el,:)=D*Be*a(Edof(el,2:end));
+    Be0=Be0_cst_largedef_func( [ Ex(el,1) Ey(el,1) ]',[ Ex(el,2) Ey(el,2) ]',[ Ex(el,3) Ey(el,3) ]');
+    Fv = [1 1 0 0]' + Be0*a(Edof(el,2:end));
+    [S,~,~] =  yeoh_cst_func(mpar.Gmod,mpar.lambda,mpar.c2,mpar.c3,Fv);
+    Sdev=S-sum(diag(S))/3*eye(3);
+    vonMises_stress(el)=sqrt(3/2)*sqrt(sum(sum(Sdev.*Sdev)));
 end
-%for plotting of stress in element (here: Es(el,1)=sigma_xx)
-for el= 1:nel
-    Esm(el,1:3)=ones(1,3)*Es(el,1);
-    Esm_2(el,1:3) = ones(1,3)*Es(el,2);
-end
-
-figure
-fill(Ex',Ey',Esm')
-title('\sigma_x_x [Pa]')
-colorbar
-axis equal
-
-figure
-fill(Ex',Ey',Esm_2')
-title('\sigma_y_y stress [Pa]')
-colorbar
-axis equal
 
 vert_disp = a(2:2:end);
 disp("maximum vertical displacemnt: " + max(abs(vert_disp))*1e3 + " [mm]")
 
-% mu and lambda
-mu = mpar.Emod/(2*(1+mpar.v));
-lambda = mpar.v*mpar.Emod/((1 + mpar.v)*(1-2*mpar.v));
-
-for i = 1:nel
-    sig_z  = lambda*(Es(i,1) + Es(i,2))/(2*(mu + lambda));
-    S = [Es(i,1) Es(i,3) 0 ; Es(i,3) Es(i,2) 0 ; 0 0 sig_z];
-    principal_stress(i,1) = max(eig(S));
-
-end
-
 figure
-fill(Ex',Ey',principal_stress')
-title('\sigma_m_a_x [Pa]')
+fill(Ex',Ey',vonMises_stress)
+title('\sigma_v_o_n [Pa]')
 colorbar
 axis equal
+
