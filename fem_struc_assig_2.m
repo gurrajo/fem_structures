@@ -17,7 +17,7 @@ D = hooke(1,E,v);
 G = E/(2*(1+v))*[1 , 0; 0 , 1];
 rho = 1000;
 g = 9.81;
-total_t = p_weight*g/l;
+total_t = -p_weight*g/l;
 
 
 nel = length(mesh);
@@ -54,10 +54,10 @@ for el = 1:nel
     Ey(el,:) = coord(nodes,2); 
     y_middle = sum(coord(nodes,2))/4; 
     P = rho*g*y_middle;
-    
+    Ke_1 = zeros(20,20);
     for i = 1:4
         xi = xi_v(:,i);
-        Ke_1 = Ke_mindlin_func_1(xi,coord(nodes(1),:)',coord(nodes(2),:)',coord(nodes(3),:)',coord(nodes(4),:)',D,G,h);
+        Ke_1 = Ke_1 + Ke_mindlin_func_1(xi,coord(nodes(1),:)',coord(nodes(2),:)',coord(nodes(3),:)',coord(nodes(4),:)',D,G,h);
     end
     [Ke_2,detFisop] = Ke_mindlin_func_2(xi_2,coord(nodes(1),:)',coord(nodes(2),:)',coord(nodes(3),:)',coord(nodes(4),:)',D,G,h);
     Ke = Ke_1+Ke_2;
@@ -97,5 +97,5 @@ eldraw2(Ex,Ey)
 figure
 Ed = extract(Edof,a); % extract element displacements for plotting
 plotpar=[1 1 0];
-sfac = 50; % magnification factor
+sfac = 1e4; % magnification factor
 eldisp2(Ex,Ey,Ed,plotpar,sfac);
