@@ -3,8 +3,8 @@ xmin = 0;
 xmax = 10;
 ymin = 0;
 ymax = 2.5;
-nelx = 50;
-nely = 25;
+nelx = 200;
+nely = 15;
 [mesh, coord, Edof] = rectMesh(xmin, xmax, ymin, ymax, nelx, nely); % el, u1, v1, w1, thetay1, thetax1,
 E = 80*10^9;
 v = 0.2;
@@ -53,23 +53,23 @@ for el = 1:nel
     Ex(el,:) = coord(nodes,1);
     Ey(el,:) = coord(nodes,2); 
     y_middle = sum(coord(nodes,2))/4; 
-    P = rho*g*y_middle;
+    P = rho*g*(ymax - y_middle);
     Ke_1 = zeros(20,20);
     for i = 1:4
         xi = xi_v(:,i);
         Ke_1 = Ke_1 + Ke_mindlin_func_1(xi,coord(nodes(1),:)',coord(nodes(2),:)',coord(nodes(3),:)',coord(nodes(4),:)',D,G,h);
     end
     [Ke_2,detFisop] = Ke_mindlin_func_2(xi_2,coord(nodes(1),:)',coord(nodes(2),:)',coord(nodes(3),:)',coord(nodes(4),:)',D,G,h);
-    Ke = Ke_1+Ke_2;
+    Ke = Ke_1 + Ke_2*2;
     for i = 1:3
         x = coord(nodes(i),1);
         y = coord(nodes(i),2);
-        if x >= 4.5 && x <= 5.5 || y == 5
+        if x >= 4.5 && x <= 5.5 && y == 2.5
             for j = (i+1):4
                 x = coord(nodes(j),1);
                 y = coord(nodes(j),2);
-                if x >= 4.5 && x <= 5.5 || y == 5
-                    del_x = abs(coord(nodes(i,1))-coord(nodes(j,1)));
+                if x >= 4.5 && x <= 5.5 && y == 2.5
+                    del_x = abs(coord(nodes(i),1)-coord(nodes(j),1));
                     del_t = total_t*del_x;
                     top_trac = zeros(1,20);
                     top_trac(i*5-3) = del_t/2;
@@ -91,11 +91,52 @@ f_C = K(dof_C, dof_F)*a_F + K(dof_C, dof_C)*a_C - f(dof_C); %reaction forces
 a(dof_F,1) = a_F;
 a(dof_C,1) = a_C;
 
-
 figure
 eldraw2(Ex,Ey)
 figure
 Ed = extract(Edof,a); % extract element displacements for plotting
+Ed_xy = [Ed(:,1) , Ed(:,2) , Ed(:,6) , Ed(:,7) , Ed(:,11) , Ed(:,12) , Ed(:,16) , Ed(:,17)];
 plotpar=[1 1 0];
-sfac = 1e4; % magnification factor
-eldisp2(Ex,Ey,Ed,plotpar,sfac);
+sfac = 1e3; % magnification factor
+eldisp2(Ex,Ey,Ed_xy,plotpar,sfac);
+
+z = 0;
+for el = 1:nel
+    nodes = mesh(:,el);
+    [sigma(el,:), tau(el,:)] = Stress_mindlin_func_2(xi_2,coord(nodes(1),:)',coord(nodes(2),:)',coord(nodes(3),:)',coord(nodes(4),:)',Ed(el,:)',D,G,z);
+    S = [sigma(el,1:2), 0, tau(el,:), sigma(el,3)]' - sum(sigma(el,1:2))/3*[1,1,1,0,0,0]';
+    sigma_vm(el) = sqrt(3/2*(S'*S + sigma(el,3)^2 + tau(el,1)^2 + tau(el,2)^2));
+end
+figure
+plotpar=[1 1 0];
+sfac = 1e2; % magnification factor
+eldisp2_fill(Ex,Ey,Ed_xy,plotpar,sfac,sigma_vm);
+hold on
+xlabel ("[m]")
+ylabel ("[m]")
+title("Deformed geometry for full top side displacement")
+colorbar
+
+% xi_3x3 = []
+% 
+% for el = 1:nel
+%     nodes = mesh(:,el);
+%     Ex(el,:) = coord(nodes,1);
+%     Ey(el,:) = coord(nodes,2); 
+%     Ke_ww = zeros(12,12);
+%     for i = 1:4
+%         xi = xi_v(:,i);
+%         Ke_ww = Ke_ww + Kww_kirchoff_func(xi,coord(nodes(1),:)',coord(nodes(2),:)',coord(nodes(3),:)',coord(nodes(4),:)',D,G,h);
+%     end
+%     for i = 1:9
+%         xi = xi_3x3(:,i);
+%         Ge = Ge + Ge_kirchoff_func(xi,coord(nodes(1),:)',coord(nodes(2),:)',coord(nodes(3),:)',coord(nodes(4),:)',D,G,h);
+%     end
+%     
+%     fe = fe + detFisop*P/4*pres_v;
+%     K(Edof(el,2:end),Edof(el,2:end)) = K(Edof(el,2:end),Edof(el,2:end)) + Ke;
+%     f(Edof(el,2:end))= f(Edof(el,2:end)) + fe';
+% end
+
+
+
