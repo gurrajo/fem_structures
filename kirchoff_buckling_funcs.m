@@ -1,8 +1,10 @@
-
+clear all; close all; clc
 
 xi = sym('xi',[2,1],'real');
-N1 = 0.25*(xi(1) - 1)*(xi(2) - 1); N2 = -0.25*(xi(1) + 1)*(xi(2) - 1);
-N3 = 0.25*(xi(1) +1)*(xi(2) + 1); N4 = -0.25*(xi(1) - 1)*(xi(2) + 1);
+N1 = 0.25*(xi(1) - 1)*(xi(2) - 1); 
+N2 = -0.25*(xi(1) + 1)*(xi(2) - 1);
+N3 = 0.25*(xi(1) +1)*(xi(2) + 1); 
+N4 = -0.25*(xi(1) - 1)*(xi(2) + 1);
 %define N-matrix for the element
 Ne = [N1 0 N2 0 N3 0 N4 0;
 0 N1 0 N2 0 N3 0 N4];
@@ -23,7 +25,7 @@ x=N1*xe1+N2*xe2+N3*xe3+N4*xe4;
 Fisop=jacobian(x,xi);
 invFisop = simplify(inv(Fisop));
 detFisop = simplify(det(Fisop));
-P(xi) = [1 xi(1) xi(2) xi(1)^2 xi(1)*xi(2) xi(2)^2 xi(1)^3 xi(1)^2*xi(2) xi(1)*xi(2)^2 xi(2)^3 xi(1)^3*xi(2) xi(1)*xi(2)^3];
+P(xi) = [1, xi(1), xi(2), xi(1)^2, xi(1)*xi(2), xi(2)^2, xi(1)^3, xi(1)^2*xi(2), xi(1)*xi(2)^2, xi(2)^3, xi(1)^3*xi(2), xi(1)*xi(2)^3];
 alpha = sym('alpha',[12,1],'real');
 w(xi) = P(xi(1), xi(2))*alpha;
 dPdxi = sym('dPdxi',[12,2],'real');
@@ -63,8 +65,7 @@ dN2_dx=simplify( inv(Fisop)'*dN2_dxi );
 dN3_dx=simplify( inv(Fisop)'*dN3_dxi );
 dN4_dx=simplify( inv(Fisop)'*dN4_dxi );
 
-Be = [dN1_dx(1), dN2_dx(1), dN3_dx(1), dN4_dx(1);
-      dN1_dx(2), dN2_dx(2), dN3_dx(2), dN4_dx(2)];
+Be = dNdx';
 
 D = sym('D',[3,3],'real');
 N_tilde = sym('N_tilde',[2,2],'real');
@@ -72,7 +73,7 @@ h = sym('h',[1,1],'real');
 D_tilde = ((h^3)/12)*D;
 
 K_ww = Bast'*D_tilde*Bast*detFisop*h;
-Ge = Be'*N_tilde*Be*detFisop*h;
+Ge = dNdx*N_tilde*dNdx'*detFisop*h;
 
 matlabFunction(K_ww, 'File','Kww_kirchoff_func','Vars',{xi,xe1,xe2,xe3,xe4,D,h});
 matlabFunction(Ge, 'File','Ge_kirchoff_func','Vars',{xi,xe1,xe2,xe3,xe4,N_tilde,h});
