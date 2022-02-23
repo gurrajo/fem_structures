@@ -1,5 +1,7 @@
 a = sym('a',[20,1],'real');
 z = sym('z',[1,1],'real');
+P = sym('P',[1,1],'real');
+t = sym('t',[1,1],'real');
 xi = sym('xi',[2,1],'real');
 N1 = 0.25*(xi(1) - 1)*(xi(2) - 1); N2 = -0.25*(xi(1) + 1)*(xi(2) - 1);
 N3 = 0.25*(xi(1) +1)*(xi(2) + 1); N4 = -0.25*(xi(1) - 1)*(xi(2) + 1);
@@ -41,12 +43,12 @@ h = sym('h',[1,1],'real');
 D_0 = D*h;
 G_0 = G*h;
 D_tilde = ((h^3)/12)*D;
-K_uu = h*detFisop*Be_1'*D_0*Be_1;
-K_ww = h*detFisop*Be_2'*G_0*Be_2;
-K_wtheta = -h*detFisop*Be_2'*G_0*Ne;
+K_uu = detFisop*Be_1'*D_0*Be_1;
+K_ww = detFisop*Be_2'*G_0*Be_2;
+K_wtheta = -detFisop*Be_2'*G_0*Ne;
 K_thetaw = K_wtheta';
-K_thetaB = h*detFisop*Be_1'*D_tilde*Be_1;
-K_thetaS = h*detFisop*Ne'*G_0*Ne;
+K_thetaB = detFisop*Be_1'*D_tilde*Be_1;
+K_thetaS = detFisop*Ne'*G_0*Ne;
 Ke_1 = sym(zeros(20,20));
 Ke_1(1:8,1:8) = K_uu;
 Ke_1(13:20,13:20) = K_thetaB;
@@ -66,6 +68,10 @@ sigma = D*(Be_1*a_u - z*Be_1*a_theta);
 
 tau = G*(Be_2*a_w-Ne*a_theta);
 
+fe_pres = Ne_w'*P*detFisop;
+
+
+matlabFunction(fe_pres,'File','fe_press_mindlin_func_1','Vars',{xi,xe1,xe2,xe3,xe4,P});
 matlabFunction(Ke_1,'File','Ke_mindlin_func_1','Vars',{xi,xe1,xe2,xe3,xe4,D,G,h});
 matlabFunction(Ke_2, detFisop,'File','Ke_mindlin_func_2','Vars',{xi,xe1,xe2,xe3,xe4,D,G,h});
 matlabFunction(sigma, tau,'File','Stress_mindlin_func_2','Vars',{xi,xe1,xe2,xe3,xe4,a,D,G,z});
