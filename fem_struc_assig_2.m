@@ -31,19 +31,26 @@ for node = 1:nnodes
     end
 end
 dof_F = [1:ndofs];
+dof_F_buckl = [1:3*nnodes];
 dof_C = [];
+dof_C_buckl = [];
 for i = 1:length(node_C)
     dof_C_node = [node_C(i)*5-4 node_C(i)*5-3 node_C(i)*5-2 node_C(i)*5-1 node_C(i)*5]; 
+    dof_C_node_buckl = [node_C(i)*3-2 node_C(i)*3-1 node_C(i)*3];
+    dof_C_buckl = horzcat(dof_C_buckl,dof_C_node_buckl);
     dof_C = horzcat(dof_C,dof_C_node);
 end
 a_C = zeros(1,length(dof_C))';
 dof_F(dof_C) = [];
-
+dof_F_buckl(dof_C_buckl) = [];
 K = spalloc(ndofs,ndofs,20*ndofs); % defines K as a sparse matrix and sets the size
 f = zeros(ndofs,1);
 xi_v = [-1/sqrt(3) -1/sqrt(3) 1/sqrt(3) 1/sqrt(3);
         -1/sqrt(3) 1/sqrt(3) -1/sqrt(3) 1/sqrt(3)];
 xi_2 = [0,0]';
+
+dofs = [1 2 9 14 13 3 4 10 16 15 5 6 11 18 17 7 8 12 20 19];
+
 Ex = zeros(nel,4);
 Ey = zeros(nel,4);
 for el = 1:nel
@@ -61,8 +68,7 @@ for el = 1:nel
         Ke_1 = Ke_1 + Ke_mindlin_func_1(xi,coord(nodes(1),:)',coord(nodes(2),:)',coord(nodes(3),:)',coord(nodes(4),:)',D,G,h);
     end
     Ke_2 = Ke_mindlin_func_2(xi_2,coord(nodes(1),:)',coord(nodes(2),:)',coord(nodes(3),:)',coord(nodes(4),:)',D,G,h);
-    w_ir1 = 4; % weight ir = 1
-    Ke = Ke_1 + Ke_2*w_ir1;
+    Ke = Ke_1 + Ke_2;
 
     %% Applied traction
     for i = 1:3
@@ -78,7 +84,7 @@ for el = 1:nel
                     top_trac = zeros(1,20);
                     top_trac(i*5-3) = del_t/2; % applied in y dof for nodes on traction boundary
                     top_trac(j*5-3) = del_t/2;
-                    %fe = fe + top_trac;
+                    fe = fe + top_trac;
                     break;
                 end
             end
@@ -88,13 +94,14 @@ for el = 1:nel
     P = -rho*g*(ymax - y_middle);
     for i = 1:4
         xi = xi_v(:,i);
-        fe(3:5:end) = fe(3:5:end) + fe_press_mindlin_func_1(xi,coord(nodes(1),:)',coord(nodes(2),:)',coord(nodes(3),:)',coord(nodes(4),:)',P)';
+        fe(3:5:end) = fe(3:5:end) + fe_press_mindlin_func(xi,coord(nodes(1),:)',coord(nodes(2),:)',coord(nodes(3),:)',coord(nodes(4),:)',P)';
     end
 
     %% Assemble
-    K(Edof(el,2:end),Edof(el,2:end)) = K(Edof(el,2:end),Edof(el,2:end)) + Ke;
+    
+    K(Edof(el,2:end),Edof(el,2:end)) = K(Edof(el,2:end),Edof(el,2:end)) + Ke(dofs,dofs);
 
-    f(Edof(el,2:end))= f(Edof(el,2:end)) + fe';
+    f(Edof(el,2:end))= f(Edof(el,2:end)) + fe(dofs)';
 end
 
 a_F = K(dof_F, dof_F)\( f(dof_F) - K(dof_F, dof_C)*a_C );
@@ -109,25 +116,25 @@ figure
 Ed = extract(Edof,a); % extract element displacements for plotting
 Ed_xy = [Ed(:,1) , Ed(:,2) , Ed(:,6) , Ed(:,7) , Ed(:,11) , Ed(:,12) , Ed(:,16) , Ed(:,17)];
 plotpar=[1 1 0];
-sfac = 1e3; % magnification factor
+sfac = 5e4; % magnification factor
 eldisp2(Ex,Ey,Ed_xy,plotpar,sfac);
 
 %% stress calculations
 z = 0;
 for el = 1:nel
     nodes = mesh(:,el);
-    [sigma(el,:), tau(el,:)] = Stress_mindlin_func_2(xi_2,coord(nodes(1),:)',coord(nodes(2),:)',coord(nodes(3),:)',coord(nodes(4),:)',Ed(el,:)',D,G,z);
+    [sigma(el,:), tau(el,:)] = Stress_mindlin_func(xi_2,coord(nodes(1),:)',coord(nodes(2),:)',coord(nodes(3),:)',coord(nodes(4),:)',Ed(el,:)',D,G,z);
     S = [sigma(el,1:2), 0, tau(el,:), sigma(el,3)]' - sum(sigma(el,1:2))/3*[1,1,1,0,0,0]';
     sigma_vm(el) = sqrt(3/2*(S'*S + sigma(el,3)^2 + tau(el,1)^2 + tau(el,2)^2));
 end
 figure
 plotpar = [1 1 0];
-sfac = 1e3; % magnification factor
+sfac = 5e4; % magnification factor
 eldisp2_fill(Ex,Ey,Ed_xy,plotpar,sfac,sigma_vm);
 hold on
 xlabel ("[m]")
 ylabel ("[m]")
-title("Deformed geometry for full top side displacement")
+title("Von mises stress in deformed geometry")
 colorbar
 
 figure 
@@ -146,14 +153,10 @@ xi_3x3 = [gp(1), gp(2), gp(3), gp(1), gp(2), gp(3), gp(1), gp(2), gp(3);
           gp(1), gp(1), gp(1), gp(2), gp(2), gp(2), gp(3), gp(3), gp(3)];
 wi_3x3 = [wi(1), wi(2), wi(1), wi(1), wi(2), wi(1), wi(1), wi(2), wi(1);
           wi(1), wi(1), wi(1), wi(2), wi(2), wi(2), wi(1), wi(1), wi(1)];
-Gr = spalloc(nnodes,nnodes,5*ndofs);
+Gr = spalloc(nnodes*3,nnodes*3,5*ndofs);
 Kww = spalloc(nnodes*3,nnodes*3,5*ndofs);
 for el = 1:nel
-    Edof_G(el,1) = el;
     Edof_Kww(el,1) = el;
-    for i = 1:4
-        Edof_G(el,i+1) = (Edof(el,(i*5-3)) + 4)/5;
-    end
     j = 2;
     for i = 1:4
         node = (Edof(el,(i*5-3)) + 4)/5; 
@@ -168,7 +171,7 @@ for el = 1:nel
     Ex(el,:) = coord(nodes,1);
     Ey(el,:) = coord(nodes,2); 
     Ke_ww = zeros(12,12);
-    Ge = zeros(4,4);
+    Ge = zeros(12,12);
     N_tilde = h*[sigma(el,1) sigma(el,3);sigma(el,3) sigma(el,2)];
     for i = 1:4
         % w = 1 
@@ -180,10 +183,11 @@ for el = 1:nel
         w = wi_3x3(1,i)*wi_3x3(2,i);
         Ge = Ge + w*Ge_kirchoff_func(xi,coord(nodes(1),:)',coord(nodes(2),:)',coord(nodes(3),:)',coord(nodes(4),:)',N_tilde,h);
     end
+    % should Ke_ww and Ge be reorganized like the mindlin Ke?
     Kww(Edof_Kww(el,2:end),Edof_Kww(el,2:end)) = Kww(Edof_Kww(el,2:end),Edof_Kww(el,2:end)) + Ke_ww;
-    Gr(Edof_G(el,2:end),Edof_G(el,2:end)) = Gr(Edof_G(el,2:end),Edof_G(el,2:end)) + Ge;
+    Gr(Edof_Kww(el,2:end),Edof_Kww(el,2:end)) = Gr(Edof_Kww(el,2:end),Edof_Kww(el,2:end)) + Ge;
 end
-n_lambda = 3;
-[V,D] = eigs(Kww(dof_F,dof_F),-Gr(dof_F,dof_F),n_lambda,'smallestabs');
+n_lambda = 3; % ???
+[V,D] = eigs(Kww(dof_F_buckl,dof_F_buckl),-Gr(dof_F_buckl,dof_F_buckl),n_lambda,'smallestabs');
 
 
