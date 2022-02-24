@@ -64,14 +64,16 @@ a_u = a([1,2,6,7,11,12,16,17]);
 a_w = a(3:5:end);
 a_theta = a([5,4,10,9,15,14,20,19]);
 
-sigma = D*(Be_1*a_u - z*Be_1*a_theta);
+w_ir1 = 4;
 
-tau = G*(Be_2*a_w-Ne*a_theta);
+sigma = w_ir1*D*(Be_1*a_u - z*Be_1*a_theta);
 
-fe_pres = Ne_w'*P*detFisop;
+tau = w_ir1*G*(Be_2*a_w-Ne*a_theta);
+
+fe_pres = w_ir1*Ne_w'*P*detFisop;
 
 
-matlabFunction(fe_pres,'File','fe_press_mindlin_func_1','Vars',{xi,xe1,xe2,xe3,xe4,P});
+matlabFunction(fe_pres,'File','fe_press_mindlin_func','Vars',{xi,xe1,xe2,xe3,xe4,P});
 matlabFunction(Ke_1,'File','Ke_mindlin_func_1','Vars',{xi,xe1,xe2,xe3,xe4,D,G,h});
 matlabFunction(Ke_2, detFisop,'File','Ke_mindlin_func_2','Vars',{xi,xe1,xe2,xe3,xe4,D,G,h});
-matlabFunction(sigma, tau,'File','Stress_mindlin_func_2','Vars',{xi,xe1,xe2,xe3,xe4,a,D,G,z});
+matlabFunction(sigma, tau,'File','Stress_mindlin_func','Vars',{xi,xe1,xe2,xe3,xe4,a,D,G,z});
