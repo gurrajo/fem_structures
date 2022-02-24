@@ -72,8 +72,8 @@ N_tilde = sym('N_tilde',[2,2],'real');
 h = sym('h',[1,1],'real');
 D_tilde = ((h^3)/12)*D;
 
-K_ww = Bast'*D_tilde*Bast*detFisop*h;
-Ge = dNdx*N_tilde*dNdx'*detFisop*h;
+K_ww = Bast'*D_tilde*Bast*detFisop;
+Ge = dNdx*N_tilde*dNdx'*detFisop;
 
 matlabFunction(K_ww, 'File','Kww_kirchoff_func','Vars',{xi,xe1,xe2,xe3,xe4,D,h});
 matlabFunction(Ge, 'File','Ge_kirchoff_func','Vars',{xi,xe1,xe2,xe3,xe4,N_tilde,h});
