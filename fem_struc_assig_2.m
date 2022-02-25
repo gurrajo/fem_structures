@@ -23,6 +23,7 @@ total_t = -p_weight*g/l;
 
 nel = length(mesh);
 nnodes = length(coord);
+node_F = [1:nnodes];
 node_C = [];
 ndofs = nnodes*5;
 for node = 1:nnodes
@@ -30,6 +31,7 @@ for node = 1:nnodes
         node_C = horzcat(node_C, node);
     end
 end
+node_F(node_C) = [];
 dof_F = [1:ndofs];
 dof_F_buckl = [1:3*nnodes];
 dof_C = [];
@@ -123,8 +125,9 @@ eldisp2(Ex,Ey,Ed_xy,plotpar,sfac);
 z = 0;
 for el = 1:nel
     nodes = mesh(:,el);
-    [sigma(el,:), tau(el,:)] = Stress_mindlin_func(xi_2,coord(nodes(1),:)',coord(nodes(2),:)',coord(nodes(3),:)',coord(nodes(4),:)',Ed(el,:)',D,G,z);
-    S = [sigma(el,1:2), 0, tau(el,:), sigma(el,3)]' - sum(sigma(el,1:2))/3*[1,1,1,0,0,0]';
+    ae = a(Edof(el,2:end));
+    [sigma(el,:), tau(el,:)] = Stress_mindlin_func(xi_2,coord(nodes(1),:)',coord(nodes(2),:)',coord(nodes(3),:)',coord(nodes(4),:)',ae,D,G,z);
+    S = [sigma(el,1:2), 0, sigma(el,3),tau(el,:)]' - sum(sigma(el,1:2))/3*[1,1,1,0,0,0]';
     sigma_vm(el) = sqrt(3/2*(S'*S + sigma(el,3)^2 + tau(el,1)^2 + tau(el,2)^2));
 end
 figure
@@ -187,7 +190,35 @@ for el = 1:nel
     Kww(Edof_Kww(el,2:end),Edof_Kww(el,2:end)) = Kww(Edof_Kww(el,2:end),Edof_Kww(el,2:end)) + Ke_ww;
     Gr(Edof_Kww(el,2:end),Edof_Kww(el,2:end)) = Gr(Edof_Kww(el,2:end),Edof_Kww(el,2:end)) + Ge;
 end
-n_lambda = 3; % ???
+n_lambda = 8;%
 [V,D] = eigs(Kww(dof_F_buckl,dof_F_buckl),-Gr(dof_F_buckl,dof_F_buckl),n_lambda,'smallestabs');
 
+d = diag(D);
+[d_sort, indx] = sort(d);
+indx_min = min(find(d_sort>0));
+lambda_1 = d(indx(indx_min));
+z_1 = V(:,indx(indx_min));
+z_w = z_1(1:3:end);
+z_w_full = zeros(nnodes,1);
+z_w_full(node_F) = z_w;
 
+figure 
+fill(Ex',Ey',z_w_full(mesh));
+hold on
+xlabel ("[m]")
+ylabel ("[m]")
+title("z deflection")
+colorbar
+n = 0;
+for i = 1:nely+1
+    for j =1:nelx+1
+        n = n + 1;
+        X(j,i) = coord(n,1);
+        Y(j,i) = coord(n,2);
+        Z(j,i) = z_w_full(n);
+    end
+end
+
+figure
+
+surf(X,Y,Z)
