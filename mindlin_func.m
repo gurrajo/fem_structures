@@ -66,9 +66,9 @@ a_theta = a([5,4,10,9,15,14,20,19]);
 
 w_ir1 = 4;
 
-sigma = w_ir1*D*(Be_1*a_u - z*Be_1*a_theta);
+sigma = D*(Be_1*a_u - z*Be_1*a_theta);
 
-tau = w_ir1*G*(Be_2*a_w-Ne*a_theta);
+tau = G*(Be_2*a_w-Ne*a_theta);
 
 fe_pres = w_ir1*Ne_w'*P*detFisop;
 
