@@ -12,7 +12,7 @@ sig_yield = 170*10^6;
 p_weight = 100; %[kg]
 l = 1;
 
-h = 40*10^-3;
+h = 6*10^-3;
 D = hooke(1,E,v);
 G = E/(2*(1+v))*[1 , 0; 0 , 1];
 rho = 1000;
@@ -95,9 +95,10 @@ for el = 1:nel
     P = -rho*g*(ymax - y_middle);
     for i = 1:4
         xi = xi_v(:,i);
-        fe(9:12) = fe(9:12) + fe_press_mindlin_func(xi,coord(nodes(1),:)',coord(nodes(2),:)',coord(nodes(3),:)',coord(nodes(4),:)',P)';
+        fe(9:12) = fe(9:12) + fe_press_mindlin_func(xi,coord(nodes(1),:)',coord(nodes(2),:)',coord(nodes(3),:)',coord(nodes(4),:)',P)'/4;
     end
-
+%     elementarea = (max(coord(nodes,1)) -  min(coord(nodes,1))) * (max(coord(nodes,2)) -  min(coord(nodes,2)));
+%     elementforce = elementarea*P;
     %% Assemble
     
     K(Edof(el,2:end),Edof(el,2:end)) = K(Edof(el,2:end),Edof(el,2:end)) + Ke(dofs,dofs);
@@ -129,6 +130,11 @@ for el = 1:nel
     S = [sigma(el,1:2), 0, sigma(el,3),tau(el,:)]' - sum(sigma(el,1:2))/3*[1,1,1,0,0,0]';
     sigma_vm(el) = sqrt(3/2*(S'*S + sigma(el,3)^2 + tau(el,1)^2 + tau(el,2)^2));
 end
+
+sigma_vm_max=abs(max(sigma_vm));
+
+FOS = sig_yield/sigma_vm_max;
+
 figure
 plotpar = [1 1 0];
 sfac = 1e6; % magnification factor
@@ -223,6 +229,8 @@ figure
 surf(X,Y,Z_buckl)
 axis equal
 
+disp("Factor of safety without buckling: " + FOS)
+disp("Factor of safety with buckling: " + lambda_1)
 
 figure
 surf(X,Y,Z_mindlin)
