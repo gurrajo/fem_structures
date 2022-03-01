@@ -1,4 +1,5 @@
 clc; clear all; close all;
+%% Constants and material paramters
 xmin = 0;
 xmax = 10;
 ymin = 0;
@@ -12,15 +13,15 @@ sig_yield = 170*10^6;
 p_weight = 100; %[kg]
 l = 1;
 
-h = 6*10^-3;
+h = 40*10^-3; % thickness
 D = hooke(1,E,v);
 G = E/(2*(1+v))*[1 , 0; 0 , 1];
-rho = 1000;
+rho = 1000; % water density
 g = 9.81;
 
-total_t = -p_weight*g/l;
+total_t = -p_weight*g/l; % total applied traction in N/m
 
-
+%% Free and constrained dofs
 nel = length(mesh);
 nnodes = length(coord);
 node_F = [1:nnodes];
@@ -45,20 +46,21 @@ end
 a_C = zeros(1,length(dof_C))';
 dof_F(dof_C) = [];
 dof_F_buckl(dof_C_buckl) = [];
+
 K = spalloc(ndofs,ndofs,20*ndofs); % defines K as a sparse matrix and sets the size
 f = zeros(ndofs,1);
 xi_v = [-1/sqrt(3) -1/sqrt(3) 1/sqrt(3) 1/sqrt(3);
-        -1/sqrt(3) 1/sqrt(3) -1/sqrt(3) 1/sqrt(3)];
-xi_2 = [0,0]';
+        -1/sqrt(3) 1/sqrt(3) -1/sqrt(3) 1/sqrt(3)]; % 2x2 gauss points
+xi_2 = [0,0]'; % 1x1 gauss point
 
-dofs = [1 2 9 14 13 3 4 10 16 15 5 6 11 18 17 7 8 12 20 19];
+dofs = [1 2 9 14 13 3 4 10 16 15 5 6 11 18 17 7 8 12 20 19]; % restructuring order
 
 Ex = zeros(nel,4);
 Ey = zeros(nel,4);
 for el = 1:nel
    
     fe = zeros(1,20);
-    nodes = mesh(:,el);
+    nodes = mesh(:,el); % element nodes
     Ex(el,:) = coord(nodes,1);
     Ey(el,:) = coord(nodes,2); 
      
@@ -66,10 +68,13 @@ for el = 1:nel
     %% Stiffness matrix
     Ke_1 = zeros(20,20);
     for i = 1:4
+        % weight = 1
         xi = xi_v(:,i);
         Ke_1 = Ke_1 + Ke_mindlin_func_1(xi,coord(nodes(1),:)',coord(nodes(2),:)',coord(nodes(3),:)',coord(nodes(4),:)',D,G,h);
     end
+    % weight inside function = 4
     Ke_2 = Ke_mindlin_func_2(xi_2,coord(nodes(1),:)',coord(nodes(2),:)',coord(nodes(3),:)',coord(nodes(4),:)',D,G,h);
+
     Ke = Ke_1 + Ke_2;
 
     %% Applied traction
@@ -81,6 +86,7 @@ for el = 1:nel
                 x = coord(nodes(j),1);
                 y = coord(nodes(j),2);
                 if x >= 4.5 && x <= 5.5 && y == 2.5
+                    % i and j are the nodes on traction boundary
                     del_x = abs(coord(nodes(i),1)-coord(nodes(j),1));
                     del_t = total_t*del_x;
                     fe(i*2) = fe(i*2) + del_t/2;
@@ -97,10 +103,8 @@ for el = 1:nel
         xi = xi_v(:,i);
         fe(9:12) = fe(9:12) + fe_press_mindlin_func(xi,coord(nodes(1),:)',coord(nodes(2),:)',coord(nodes(3),:)',coord(nodes(4),:)',P)'/4;
     end
-%     elementarea = (max(coord(nodes,1)) -  min(coord(nodes,1))) * (max(coord(nodes,2)) -  min(coord(nodes,2)));
-%     elementforce = elementarea*P;
     %% Assemble
-    
+    % use restructuring
     K(Edof(el,2:end),Edof(el,2:end)) = K(Edof(el,2:end),Edof(el,2:end)) + Ke(dofs,dofs);
 
     f(Edof(el,2:end))= f(Edof(el,2:end)) + fe(dofs)';
@@ -112,6 +116,8 @@ f_C = K(dof_C, dof_F)*a_F + K(dof_C, dof_C)*a_C - f(dof_C); %reaction forces
 a(dof_F,1) = a_F;
 a(dof_C,1) = a_C;
 
+%% Plots
+% deformed geoemtry
 figure
 eldraw2(Ex,Ey)
 figure
@@ -119,10 +125,13 @@ Ed = extract(Edof,a); % extract element displacements for plotting
 Ed_xy = [Ed(:,1) , Ed(:,2) , Ed(:,6) , Ed(:,7) , Ed(:,11) , Ed(:,12) , Ed(:,16) , Ed(:,17)];
 plotpar=[1 1 0];
 sfac = 1e6; % magnification factor
+title("In plane deformation (10^6 magnification)")
+xlabel("[m]")
+ylabel("[m]")
 eldisp2(Ex,Ey,Ed_xy,plotpar,sfac);
 
 %% stress calculations
-z = 0;
+z = 0; 
 for el = 1:nel
     nodes = mesh(:,el);
     ae = a(Edof(el,2:end));
@@ -133,8 +142,10 @@ end
 
 sigma_vm_max=abs(max(sigma_vm));
 
-FOS = sig_yield/sigma_vm_max;
+FOS = sig_yield/sigma_vm_max; % factor of safety
 
+
+% deformed geomtry in plane with von misesss stress
 figure
 plotpar = [1 1 0];
 sfac = 1e6; % magnification factor
@@ -142,23 +153,24 @@ eldisp2_fill(Ex,Ey,Ed_xy,plotpar,sfac,sigma_vm);
 hold on
 xlabel ("[m]")
 ylabel ("[m]")
-title("Von mises stress in deformed geometry")
+title("Von misess stress in deformed geometry for z = h/2")
 colorbar
 
+% out of plane displacemnet pre buckling
 figure 
 w = Ed(:,3:5:end);
 fill(Ex',Ey',w');
 hold on
 xlabel ("[m]")
 ylabel ("[m]")
-title("z deflection")
+title("z deflection for Mindlin plate")
 colorbar
 
 %% Task 2
 gp = [-sqrt(3/5), 0, sqrt(3/5)];
 wi = [5/9, 8/9];
 xi_3x3 = [gp(1), gp(2), gp(3), gp(1), gp(2), gp(3), gp(1), gp(2), gp(3);
-          gp(1), gp(1), gp(1), gp(2), gp(2), gp(2), gp(3), gp(3), gp(3)];
+          gp(1), gp(1), gp(1), gp(2), gp(2), gp(2), gp(3), gp(3), gp(3)]; % 3x3 gauss points 
 wi_3x3 = [wi(1), wi(2), wi(1), wi(1), wi(2), wi(1), wi(1), wi(2), wi(1);
           wi(1), wi(1), wi(1), wi(2), wi(2), wi(2), wi(1), wi(1), wi(1)];
 Gr = spalloc(nnodes*3,nnodes*3,5*ndofs);
@@ -188,14 +200,15 @@ for el = 1:nel
     end
     for i = 1:9
         xi = xi_3x3(:,i);
-        w = wi_3x3(1,i)*wi_3x3(2,i);
+        w = wi_3x3(1,i)*wi_3x3(2,i); % weight used, product of correspoding weight for each xi value
         Ge = Ge + w*Ge_kirchoff_func(xi,coord(nodes(1),:)',coord(nodes(2),:)',coord(nodes(3),:)',coord(nodes(4),:)',N_tilde,h);
     end
-    % should Ke_ww and Ge be reorganized like the mindlin Ke?
+
     Kww(Edof_Kww(el,2:end),Edof_Kww(el,2:end)) = Kww(Edof_Kww(el,2:end),Edof_Kww(el,2:end)) + Ke_ww;
     Gr(Edof_Kww(el,2:end),Edof_Kww(el,2:end)) = Gr(Edof_Kww(el,2:end),Edof_Kww(el,2:end)) + Ge;
 end
-n_lambda = 8;%
+
+n_lambda = 8;% any postive integer ok, should include as many modes as are relevent
 [V,D] = eigs(Kww(dof_F_buckl,dof_F_buckl),-Gr(dof_F_buckl,dof_F_buckl),n_lambda,'smallestabs');
 
 d = diag(D);
@@ -207,13 +220,21 @@ z_w = z_1(1:3:end);
 z_w_full = zeros(nnodes,1);
 z_w_full(node_F) = z_w;
 
+disp("Factor of safety yield stress: " + FOS)
+disp("Factor of safety buckling: " + lambda_1)
+
+% z deflection using kirchhoff buckling
 figure 
 fill(Ex',Ey',z_w_full(mesh));
 hold on
 xlabel ("[m]")
 ylabel ("[m]")
-title("z deflection")
+title("z deflection for Kirchhoff buckling")
 colorbar
+
+
+
+%% extra plots not asked for
 n = 0;
 for i = 1:nely+1
     for j =1:nelx+1
@@ -227,11 +248,8 @@ end
 
 figure
 surf(X,Y,Z_buckl)
-axis equal
 
-disp("Factor of safety without buckling: " + FOS)
-disp("Factor of safety with buckling: " + lambda_1)
+
 
 figure
 surf(X,Y,Z_mindlin)
-axis equal
